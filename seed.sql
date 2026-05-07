@@ -50,3 +50,86 @@ VALUES
     (5,1,150.00,'Paid'),
     (5,5,250.00,'Pending');
 
+-- QUERIES
+
+-- Query 1: All patients with their appointment date, time, and assigned provider
+-- Shows staff a complete view of scheduled visits with provider and specialty
+SELECT
+    CONCAT(p.first_name, ' ', p.last_name)   AS patient_name,
+    a.appointment_date,
+    a.appointment_time,
+    a.appointment_status,
+    CONCAT(pr.first_name, ' ', pr.last_name) AS provider_name,
+    pr.specialty
+FROM appointment a
+JOIN patient  p  ON a.patient_ID  = p.patient_ID
+JOIN provider pr ON a.provider_ID = pr.provider_ID
+ORDER BY a.appointment_date;
+
+-- Query 2: Visit diagnoses and treatment notes per patient
+-- Supports clinical documentation review and care coordination
+SELECT
+    CONCAT(p.first_name, ' ', p.last_name) AS patient_name,
+    v.visit_date,
+    v.diagnosis,
+    v.treatment_notes
+FROM visit v
+JOIN appointment a ON v.appointment_ID = a.appointment_ID
+JOIN patient     p ON a.patient_ID     = p.patient_ID
+ORDER BY v.visit_date;
+
+-- Query 3: Full billing summary per patient with service and payment status
+-- Allows billing staff to identify outstanding balances
+SELECT
+    CONCAT(p.first_name, ' ', p.last_name) AS patient_name,
+    p.insurance_provider,
+    s.service_name,
+    b.total_amount,
+    b.payment_status
+FROM billing b
+JOIN visit       v  ON b.visit_ID       = v.visit_ID
+JOIN appointment a  ON v.appointment_ID = a.appointment_ID
+JOIN patient     p  ON a.patient_ID     = p.patient_ID
+JOIN service     s  ON b.service_ID     = s.service_ID
+ORDER BY p.last_name;
+
+-- Query 4: Total revenue collected vs. pending per provider
+-- Helps administrators track provider-level billing performance
+SELECT
+    CONCAT(pr.first_name, ' ', pr.last_name) AS provider_name,
+    pr.specialty,
+    SUM(CASE WHEN b.payment_status = 'Paid'    THEN b.total_amount ELSE 0 END) AS total_collected,
+    SUM(CASE WHEN b.payment_status = 'Pending' THEN b.total_amount ELSE 0 END) AS total_pending
+FROM billing b
+JOIN visit       v  ON b.visit_ID       = v.visit_ID
+JOIN appointment a  ON v.appointment_ID = a.appointment_ID
+JOIN provider    pr ON a.provider_ID    = pr.provider_ID
+GROUP BY pr.provider_ID, provider_name, pr.specialty
+ORDER BY total_collected DESC;
+
+-- Query 5: Patients with Molina insurance who have pending balances
+-- Supports payer-specific billing follow-up
+SELECT
+    CONCAT(p.first_name, ' ', p.last_name) AS patient_name,
+    p.insurance_provider,
+    s.service_name,
+    b.total_amount
+FROM billing b
+JOIN visit       v  ON b.visit_ID       = v.visit_ID
+JOIN appointment a  ON v.appointment_ID = a.appointment_ID
+JOIN patient     p  ON a.patient_ID     = p.patient_ID
+JOIN service     s  ON b.service_ID     = s.service_ID
+WHERE p.insurance_provider = 'Molina'
+  AND b.payment_status = 'Pending'
+ORDER BY p.last_name;
+
+-- Query 6: Total number of appointments per clinic location
+-- Measures patient volume by site for operational planning
+SELECT
+    pr.clinic_location,
+    COUNT(a.appointment_ID) AS total_appointments
+FROM appointment a
+JOIN provider pr ON a.provider_ID = pr.provider_ID
+GROUP BY pr.clinic_location
+ORDER BY total_appointments DESC;
+
